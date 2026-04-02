@@ -1,26 +1,41 @@
-FROM alpine
-MAINTAINER Christian Gatzlaff <cgatzlaff@gmail.com>
+FROM alpine:3.20
 
-RUN apk update && apk add --no-cache bash nginx php7-fpm php7-cli php7-common php7-json php7-soap php7-simplexml php7-session \
-    && apk add --no-cache --virtual build-dependencies wget unzip \
-    && wget --no-check-certificate https://github.com/pasha1st/phpvirtualbox-6/releases/download/6.0-1-pasha1st/phpvirtualbox-6.0-1-pasha1st.zip -O phpvirtualbox.zip \
-    && unzip phpvirtualbox.zip -d phpvirtualbox \
-    && mkdir -p /var/www \
-    && mv -v phpvirtualbox/*/* /var/www/ \
-    && rm phpvirtualbox.zip \
-    && rm phpvirtualbox/ -R \
-    && apk del build-dependencies \
+LABEL maintainer="Viperdriver2000 <Viperdriver2000@gmail.com>"
+LABEL description="phpVirtualBox web interface for VirtualBox 6.x"
+
+RUN apk add --no-cache \
+        bash \
+        nginx \
+        php83-fpm \
+        php83-cli \
+        php83-json \
+        php83-soap \
+        php83-simplexml \
+        php83-session \
+    && ln -sf /usr/bin/php83 /usr/bin/php \
+    && mkdir -p /var/www /run/nginx
+
+RUN apk add --no-cache --virtual .build-deps wget unzip \
+    && wget -q --no-check-certificate \
+        https://github.com/pasha1st/phpvirtualbox-6/releases/download/6.0-1-pasha1st/phpvirtualbox-6.0-1-pasha1st.zip \
+        -O /tmp/phpvirtualbox.zip \
+    && unzip -q /tmp/phpvirtualbox.zip -d /tmp/phpvirtualbox \
+    && mv /tmp/phpvirtualbox/*/* /var/www/ \
+    && rm -rf /tmp/phpvirtualbox.zip /tmp/phpvirtualbox \
+    && apk del .build-deps \
     && echo "<?php return array(); ?>" > /var/www/config-servers.php \
     && echo "<?php return array(); ?>" > /var/www/config-override.php \
-    && chown nobody:nobody -R /var/www
+    && chown -R nobody:nobody /var/www
 
-# config files
 COPY config.php /var/www/config.php
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY servers-from-env.php /servers-from-env.php
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# expose only nginx HTTP port
 EXPOSE 80
 
-# write linked instances to config, then monitor all services
-CMD php7 /servers-from-env.php && php-fpm7 && nginx
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD wget -qO- http://localhost/healthz || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]

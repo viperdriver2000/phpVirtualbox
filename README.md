@@ -1,139 +1,112 @@
-# docker-phpvirtualbox
+# phpVirtualbox-docker
 
-This is a fork of [jazzdd/phpvirtualbox](https://hub.docker.com/r/jazzdd/phpvirtualbox/)
+Docker container for [phpVirtualBox](http://sourceforge.net/projects/phpvirtualbox/) — a web interface to manage remote VirtualBox instances, compatible with VirtualBox 6.x.
 
-This is a fork of [clue/phpvirtualbox](https://hub.docker.com/r/clue/phpvirtualbox/), because it is not very up to date and there are no further configuration options.
+Fork of [jazzdd86/phpVirtualbox](https://github.com/jazzdd86/phpVirtualbox) using the [pasha1st VB 6.x build](https://github.com/pasha1st/phpvirtualbox-6/).
 
-## phpVirtualBox
+> **Note:** This project is kept for reference. phpVirtualBox is largely unmaintained upstream.
 
-[phpVirtualBox](http://sourceforge.net/projects/phpvirtualbox/) is a modern web interface that allows you to control remote VirtualBox instances - mirroring the VirtualBox GUI.
-
-![](http://a.fsdn.com/con/app/proj/phpvirtualbox/screenshots/phpvb1.png)
-
-
-## Caution due to changes on 03.01.2019
-
-Changed image behavior and environment variables:
-
-The environment variable *_PORT_18083_TCP changed to *_HOSTPORT
-
-Now, the default behavior is to use authentication. If no authentication is used please specify -e CONF_noAuth='true'.
-
-If using multiple servers, there is a need to specify one server as authentication server with *_CONF_authMaster='true'.
-
-## Usage
-This image provides the phpVirtualBox web interface that communicates with any number of VirtualBox installations on your computers.
-
-Internally, the phpVirtualBox web interface communicates with each VirtualBox installation through the `vboxwebsrv` program that is installed as part of VirtualBox.
-
-The container is started with following command:
-
-```
-docker run --name vbox_http --restart=always \
-    -p 80:80 \
-    -e ID_HOSTPORT=ServerIP:PORT \
-    -e ID_NAME=serverName \
-    -e ID_USER=vboxUser \
-    -e ID_PW='vboxUserPassword' \
-    -e CONF_browserRestrictFolders="/data,/home" \
-    -d jazzdd/phpvirtualbox
-```
-
-* `-p {OutsidePort}:80` - will bind the webserver to the given host port
-* `-d jazzdd/phpvirtualbox` - the name of this docker image
-* `-e ID_NAME` - name of the vbox server - display name of the Server in the UI - could be any name
-* `-e ID_HOSTPORT` - ip/hostname and port of the vbox server
-* `-e ID_USER` - user name of the user in the vbox group
-* `-e ID_PW` - password of this user
-* `-e CONF_varName` - override default config value of varName, browserRestrictFolders is a useful example. Coma-separated strings will be converted into an array.
-
-ID is an identifier to get all matching environment variables for one vbox server. So, it is possible to define more then one VirtualBox server and manage it with one phpVirtualbox instance.
-
-An example would look as follows:
-```
-docker run --name vbox_http --restart=always -p 80:80 \
-    -e SRV1_HOSTPORT=192.168.1.1:18083 -e SRV1_NAME=Server1 -e SRV1_USER=user1 -e SRV1_PW='test' \
-    -e SRV2_HOSTPORT=192.168.1.2:18083 -e SRV2_NAME=Server2 -e SRV2_USER=user2 -e SRV2_PW='test' \
-    -d jazzdd/phpvirtualbox
-```
-
-## Running vboxwebsrv as a container
-Instead of exposing the vboxwebsrv service to the outside, the [jazzdd86/vboxwebsrv](https://github.com/jazzdd86/vboxwebsrv) image could be used to establish a secure ssh connection to the server and start the vboxwebsrv service on demand and tunneling the vboxwebsrv port to the phpVirtualbox container.
-
-See [jazzdd86/vboxwebsrv](https://github.com/jazzdd86/vboxwebsrv) for more information on how to start the vboxwebsrv service via docker image.
-
-Example:
+## Quick Start
 
 ```bash
-$ docker run -it --name=vbox_websrv_1 --restart=always jazzdd/vboxwebsrv user1@192.168.1.1
+docker run -d \
+  --name phpvirtualbox \
+  -p 8080:80 \
+  -e SRV1_HOSTPORT=192.168.1.10:18083 \
+  -e SRV1_NAME=MyServer \
+  -e SRV1_USER=vboxuser \
+  -e SRV1_PW=secret \
+  viperdriver2000/phpvirtualbox
 ```
 
-To run phpVirtualbox with the vboxwebsrv container use following command:
+Default login: **admin / admin** (phpVirtualBox built-in auth).
+
+## Build
 
 ```bash
-$ docker run --name vbox_http --restart=always -p 80:80 -e SRV1_HOSTPORT=vbox_websrv_1:18083 -e SRV1_NAME=Server1 -e SRV1_USER=user1 -e SRV1_PW='test' -d jazzdd/phpvirtualbox
+docker build -t phpvirtualbox .
 ```
 
-## Configurations
+## Environment Variables
 
-As mentioned before `-e CONF_varName` can override default config values of varName. This configuration options can be used in two ways:
+### Server Configuration
+
+Each VirtualBox server is configured via a set of prefixed environment variables. The prefix (`SRV1`, `SRV2`, etc.) groups the variables for one server.
+
+| Variable | Required | Description |
+|---|---|---|
+| `{ID}_HOSTPORT` | yes | IP/hostname and port of vboxwebsrv (e.g. `192.168.1.1:18083`) |
+| `{ID}_NAME` | no | Display name in the UI |
+| `{ID}_USER` | no | vboxwebsrv username (default: `username`) |
+| `{ID}_PW` | no | vboxwebsrv password (default: `password`) |
+| `{ID}_CONF_{option}` | no | Per-server config override |
+
+### Global Configuration
+
+| Variable | Description |
+|---|---|
+| `CONF_noAuth=true` | Disable authentication |
+| `CONF_browserRestrictFolders` | Restrict file browser paths (comma-separated) |
+| `CONF_{varName}` | Override any phpVirtualBox config variable |
+
+Comma-separated values are automatically converted to arrays.
+
+## Multiple Servers
 
 ```bash
-$ docker run --name vbox_http --restart=always \
-    -e SRV1_HOSTPORT=192.168.1.1:18083 -e SRV1_NAME=Server1 -e SRV1_USER=user1 -e SRV1_PW='test' \
-    -e SRV2_HOSTPORT=192.168.1.2:18083 -e SRV2_NAME=Server2 -e SRV2_USER=user2 -e SRV2_PW='test' \
-    -e SRV1_CONF_browserRestrictFolders="/data,/home" \
-    -e CONF_browserRestrictFolders="/vm," \
-    -d jazzdd/phpvirtualbox
+docker run -d --name phpvirtualbox -p 8080:80 \
+  -e SRV1_HOSTPORT=192.168.1.1:18083 \
+  -e SRV1_NAME=Server1 \
+  -e SRV1_USER=user1 \
+  -e SRV1_PW=pass1 \
+  -e SRV1_CONF_authMaster=true \
+  -e SRV2_HOSTPORT=192.168.1.2:18083 \
+  -e SRV2_NAME=Server2 \
+  -e SRV2_USER=user2 \
+  -e SRV2_PW=pass2 \
+  viperdriver2000/phpvirtualbox
 ```
 
-* 1. `-e SRV1_CONF_browserRestrictFolders="/data,/home"` - config parameter only valid for one specific virtualbox server
-* 2. `-e CONF_browserRestrictFolders="/data,"` - global configuration - valid for all virtualbox servers, if more than one server was specified
-
-If an option requires an array but only one parameter is given enter a comma after the option (see option 2).
-
-## Authentication
-The image enables authentication by default. Default login would be admin/admin.
-
-If using multiple servers, there is a need to specify one server as authentication server with e.g. SRV1_CONF_authMaster='true'. If no authMaster is specified, phpVirtualBox uses the first configured server.
-
-If no authentication is used please specify -e CONF_noAuth='true'.
+When using multiple servers, set `authMaster=true` on one server to use it for authentication.
 
 ## Docker Compose
-A docker compose file could look as follows (including one vboxwebsrv service):
 
-```yml
-version: '3'
+```yaml
 services:
-    vbox_http:
-        container_name: vbox_http
-        restart: always
-        ports:
-            - "8080:80"
-        environment:
-            SRV1_HOSTPORT: "vbox_websrv_1:18083"
-            SRV1_NAME: "Server1"
-            SRV1_USER: "user1"
-            SRV1_PW: "test"
-            SRV2_HOSTPORT: "192.168.1.2:18083"
-            SRV2_NAME: "Server2"
-            SRV2_USER: "user2"
-            SRV2_PW: "test"
-            SRV2_CONF_browserRestrictFolders: "/data,"
-            SRV2_CONF_authMaster: "true"
-            CONF_browserRestrictFolders: "/home,/usr/lib/virtualbox,"
-            CONF_noAuth: "true"
-        depends_on:
-            - vbox_websrv
-        image: jazzdd/phpvirtualbox
-
-    vbox_websrv:
-        container_name: vbox_websrv_1
-        restart: always
-        volumes:
-            - "./ssh:/root/.ssh"
-        environment:
-            USE_KEY: 1
-        image: jazzdd/vboxwebsrv
-        command: user1@192.168.1.1
+  phpvirtualbox:
+    build: .
+    container_name: phpvirtualbox
+    ports:
+      - "8080:80"
+    environment:
+      SRV1_HOSTPORT: "192.168.1.10:18083"
+      SRV1_NAME: "VBox-Server"
+      SRV1_USER: "vboxuser"
+      SRV1_PW: "secret"
+    restart: unless-stopped
 ```
+
+## Running vboxwebsrv as a Container
+
+Use [jazzdd86/vboxwebsrv](https://github.com/jazzdd86/vboxwebsrv) to establish a secure SSH tunnel to the VirtualBox host:
+
+```bash
+docker run -d --name vbox_websrv \
+  -v ./ssh:/root/.ssh \
+  -e USE_KEY=1 \
+  jazzdd/vboxwebsrv user@192.168.1.10
+
+docker run -d --name phpvirtualbox -p 8080:80 \
+  -e SRV1_HOSTPORT=vbox_websrv:18083 \
+  -e SRV1_NAME=MyServer \
+  -e SRV1_USER=vboxuser \
+  -e SRV1_PW=secret \
+  viperdriver2000/phpvirtualbox
+```
+
+## Endpoints
+
+| Path | Description |
+|---|---|
+| `/` | phpVirtualBox web UI |
+| `/healthz` | Health check |
